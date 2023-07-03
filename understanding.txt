@@ -1,0 +1,4 @@
+--> language models take vectors(arrays of floats) as an input
+--> transformers pipeline
+        - raw_text --> input Ids --> logits (from the model) --> predictions (positive or negative sentence)
+        - sample 

@@ -1,0 +1,264 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Globals:
+  Function:
+    Timeout: 30
+Resources:
+  MountTargetSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: sandy-sg-jfrog
+      GroupName: sandy-sg-jfrog
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: '0.0.0.0/0'
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: 0
+        ToPort: 65535
+        CidrIp: '0.0.0.0/0'
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+      VpcId:
+        Ref: MountTargetVPC
+  MountTargetVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.31.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  AttachIGW:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: IGW
+      VpcId:
+        Ref: MountTargetVPC
+  MountTargetSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 172.31.1.0/24
+      VpcId:
+        Ref: MountTargetVPC
+      AvailabilityZone:
+        Fn::Sub: ${AWS::Region}a
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  MountTargetSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 172.31.2.0/24
+      VpcId:
+        Ref: MountTargetVPC
+      AvailabilityZone:
+        Fn::Sub: ${AWS::Region}b
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  MountTargetSubnetThree:
+    Type: AWS::EC2::Subnet
+    Properties:
+      CidrBlock: 172.31.3.0/24
+      VpcId:
+        Ref: MountTargetVPC
+      AvailabilityZone:
+        Fn::Sub: ${AWS::Region}c
+      MapPublicIpOnLaunch: true
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  PublicRouteTableOne:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: MountTargetVPC
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  PublicRouteTableTwo:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: MountTargetVPC
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  PublicRouteTableThree:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: MountTargetVPC
+      Tags:
+      - Key: owner
+        Value: sandy-efs
+  RouteToIGWOne:
+    Type: AWS::EC2::Route
+    DependsOn: AttachIGW
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTableOne
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId:
+        Ref: IGW
+  RouteToIGWTwo:
+    Type: AWS::EC2::Route
+    DependsOn: AttachIGW
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTableTwo
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId:
+        Ref: IGW
+  RouteToIGWThree:
+    Type: AWS::EC2::Route
+    DependsOn: AttachIGW
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTableThree
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId:
+        Ref: IGW
+  AssociateRouteTableOne:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: MountTargetSubnetOne
+      RouteTableId:
+        Ref: PublicRouteTableOne
+  AssociateRouteTableTwo:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: MountTargetSubnetTwo
+      RouteTableId:
+        Ref: PublicRouteTableTwo
+  AssociateRouteTableThree:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: MountTargetSubnetThree
+      RouteTableId:
+        Ref: PublicRouteTableThree
+  FileSystemResource:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: maxIO
+      Encrypted: true
+      FileSystemTags:
+      - Key: Name
+        Value: sandy-efs
+      FileSystemPolicy:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Action:
+          - elasticfilesystem:ClientMount
+          - elasticfilesystem:ClientWrite
+          Principal:
+            AWS: '*'
+  MountTargetResource1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: MountTargetSubnetOne
+      SecurityGroups:
+      - Fn::GetAtt:
+        - MountTargetSG
+        - GroupId
+  MountTargetResource2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: MountTargetSubnetTwo
+      SecurityGroups:
+      - Fn::GetAtt:
+        - MountTargetSG
+        - GroupId
+  MountTargetResource3:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      SubnetId:
+        Ref: MountTargetSubnetThree
+      SecurityGroups:
+      - Fn::GetAtt:
+        - MountTargetSG
+        - GroupId
+  AccessPointResource:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId:
+        Ref: FileSystemResource
+      PosixUser:
+        Uid: '1000'
+        Gid: '1000'
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: '1000'
+          OwnerUid: '1000'
+          Permissions: '0777'
+        Path: /myefs
+  SentimentAnalysis:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: SentimentAnalysis
+      Handler: main.lambda_handler
+      Runtime: python3.10
+      VpcConfig:
+        SecurityGroupIds:
+        - Ref: MountTargetSG
+        SubnetIds:
+        - Ref: MountTargetSubnetOne
+        - Ref: MountTargetSubnetTwo
+        - Ref: MountTargetSubnetThree
+      FileSystemConfigs:
+      - Arn:
+          Fn::GetAtt:
+          - AccessPointResource
+          - Arn
+        LocalMountPath: /mnt/efs
+    DependsOn: FileSystemResource
+    Metadata:
+      SamResourceId: SentimentAnalysis
+  TestLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: TestLambda
+      Handler: main.lambda_handler
+      Runtime: python3.10
+      VpcConfig:
+        SecurityGroupIds:
+        - Ref: MountTargetSG
+        SubnetIds:
+        - Ref: MountTargetSubnetOne
+        - Ref: MountTargetSubnetTwo
+        - Ref: MountTargetSubnetThree
+      FileSystemConfigs:
+      - Arn:
+          Fn::GetAtt:
+          - AccessPointResource
+          - Arn
+        LocalMountPath: /mnt/efs
+    DependsOn: FileSystemResource
+    Metadata:
+      SamResourceId: TestLambda
